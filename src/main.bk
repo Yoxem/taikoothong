@@ -1,0 +1,200 @@
+use gtk4::prelude::*;
+use gtk4::glib;
+use gtk4::*;
+use gdk4::Display;
+use serde_json::{Result, Value}; // JSON
+use anyhow; // Exception Handling
+use chrono::{Utc, TimeZone};
+use curl::easy::Easy;
+
+enum Date{
+    Day(u8),
+    Week(u8),
+    Month(u8),
+    YearToDate, // days of current year
+    Max
+}
+impl Date {
+    fn as_str(&self) -> String {
+        match &self{
+            Date::Day(d) =>  format!("{:?}d", d),
+            Date::Week(wk) =>  format!("{:?}wk", wk),
+            Date::Month(mo) =>  format!("{:?}mo", mo),
+            Date::YearToDate => format!("ytd"),
+            Date::Max =>  format!("max"),
+        }
+    }
+}
+
+// Try visiting:
+//   http://127.0.0.1:8000/wave/Rocketeer/100
+
+
+fn get_tw_stock(stock_id: &str) -> Option<Vec<String>> {
+    // let a = "👋 Hello, stock no: a22";
+
+    let response_body = get_stock_data(stock_id, Date::Day(1),Date::Week(1));
+    let response_json: Value =  serde_json::from_str(response_body.as_str()).ok()?;
+
+    let days_in_unix_time  = &response_json["chart"]["result"][0]["timestamp"];
+
+    let days_in_custom_format = match days_in_unix_time {
+        serde_json::Value::Array(days_vec) =>  days_vec
+                                            .iter()
+                                            .map(|day|
+                                                {json_unix_time_to_date(day)})
+                                            .collect::<Vec<_>>(),
+        _ => vec![format!("Not a series of date")],
+    };
+
+    let price_and_volume_infos  = &response_json["chart"]["result"][0]["indicators"]["quote"][0];
+
+    print!("{:}", price_and_volume_infos);
+            
+    
+    return Some(days_in_custom_format);    
+}
+
+fn json_unix_time_to_date(json_value : &Value) -> String{
+
+    let unix_time = json_value.as_i64().unwrap();
+    println!("{:?}", unix_time);
+
+
+    let naive_time = Utc.timestamp_opt(unix_time, 0).unwrap();
+    
+    let date = format!("{}", naive_time.format("%Y-%m-%d"));
+    println!("{:?}", date);
+
+    return date;
+}
+
+fn get_stock_data(stock_id : &str, interval : Date, range : Date) -> 
+        String {
+
+    let intrval_str = interval.as_str();
+    let range_str = range.as_str();
+
+    let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/\
+        {:}.TW?metrics=Date,High,Low,Open,Close,Volume&interval={:}&range={:}", stock_id,
+        intrval_str, range_str);
+
+    let mut curl_easy = Easy::new(); // fetch the data with the curl binding
+    let mut response = String::new(); 
+
+    {
+        curl_easy.url(url.as_str()).unwrap();
+
+        
+        let mut curl_transfer = curl_easy.transfer();
+
+        curl_transfer.write_function(|data| {
+            response.push_str(std::str::from_utf8(data).unwrap());  
+            Ok(data.len())
+        }).unwrap();
+    
+        curl_transfer.perform().unwrap();
+    }
+
+    let response_returned = response.clone();
+
+
+
+    return response_returned;
+
+
+}
+
+fn main() -> glib::ExitCode{
+    let application = Application::builder()
+        .application_id("info.kianting.sns.taiuankoo") // app ê id
+        .build();
+
+    application.connect_startup(|_| load_css());
+    application.connect_activate(build_ui); // 連結起做ui ê
+    application.run() // 紡app
+}
+
+fn load_css() {
+    let provider = CssProvider::new();
+
+    //載css kàu style provider
+    provider.load_from_data(include_str!("./assets/style.css"));
+
+    // kā載入去
+    gtk4::style_context_add_provider_for_display(
+        &gdk4::Display::default().expect("無法連結到顯示"),
+        &provider,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
+}
+
+
+// 起做ui
+fn build_ui(application: &gtk4::Application) {
+    // Create a new window, set its title and default size
+    let window = gtk4::ApplicationWindow::new(application);
+    window.set_title(Some("臺灣股"));
+    window.set_default_size(1200, 1000);
+
+    let main_grid = Grid::builder()
+        .margin_start(1) // 倒爿ê邊仔留空白ê闊度
+        .margin_end(1) // 正爿ê邊仔留空白ê闊度
+        .margin_top(1)// 頂懸ê邊仔留空白ê懸度
+        .margin_bottom(1) // 下底ê邊仔留空白ê懸度
+        .halign(Align::Start)//水平排列
+        .valign(Align::Start)//垂直排列
+        .row_spacing(1)// 逐列ê縫留空白ê懸度
+        .column_spacing(1)// 逐欄ê縫留空白ê闊度
+        .build();
+    window.set_child(Some(&main_grid));
+
+
+    // create and add the wrapper scrolled to the window
+    let data_grid_scrolled_wrapper = ScrolledWindow::new();
+    data_grid_scrolled_wrapper.set_min_content_width(800);
+
+    main_grid.attach(&data_grid_scrolled_wrapper, 1, 1, 1, 1);
+
+
+    // Here we construct the grid that is going contain our buttons.
+    let data_grid = Grid::builder()
+        .margin_start(1) // 倒爿ê邊仔留空白ê闊度
+        .margin_end(1) // 正爿ê邊仔留空白ê闊度
+        .margin_top(1)// 頂懸ê邊仔留空白ê懸度
+        .margin_bottom(1) // 下底ê邊仔留空白ê懸度
+        .halign(Align::Start)//水平排列
+        .valign(Align::Start)//垂直排列
+        .row_spacing(1)// 逐列ê縫留空白ê懸度
+        .column_spacing(1)// 逐欄ê縫留空白ê闊度
+        .build();
+
+    // data_grid.set_widget_name("data-grid"); // for css usage
+    data_grid_scrolled_wrapper.set_child(Some(&data_grid));
+
+
+
+    let default_col_titles =vec!["日期", "開盤", "收盤", "最高", "最低", "成交量"];
+    let default_col_titles_len = default_col_titles.len();
+    let col_no = 20;
+    for i in 0..(col_no-1){
+        let mut entry = Entry::new();
+
+        if i < default_col_titles_len{
+            entry.set_text (default_col_titles[i]);
+            entry.set_hexpand(true);
+            entry.set_vexpand(true);
+            gtk4::prelude::EntryExt::set_alignment(&entry, 0.5); // 0.5表示khǹg佇中央
+            data_grid.attach(&entry, i as i32, 0, 1, 1);
+            data_grid.set_widget_name(format!("entry-{}-0", i).as_str()); // for css usage
+        }
+        else{
+            entry.set_text ("");
+            data_grid.attach(&entry, i as i32, 0, 1, 1);
+        }
+    }
+
+    let a = get_tw_stock("0050");
+
+    window.present();
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+
+<head>
+<title>台股通</title>
+<style type="text/css">
+#stock-table{
+    border-collapse: collapse;
+
+}
+#stock-table th {
+    border: 1px solid red;
+} 
+#stock-table td {
+  text-align: right;
+  padding: 1em 0.6em;
+  border: 1px solid red;
+}
+</style>
+
+</head>
+
+<html>
+    <body>
+        <table id="stock-table">
+            <tr id="title-of-table">
+            <th>日期</th>
+            <th>開盤</th>
+            <th>收盤</th>
+            <th>最高</th>
+            <th>最低</th>
+            <th>成交量</th>
+            </tr>
+{{#each date}}
+   <tr id={{this}}>
+    <td id="date">{{this}}</td>
+    <td class="open">{{lookup ../open @index}}</td>
+    <td class="close">{{lookup ../close @index}}</td>
+    <td class="high">{{lookup ../high @index}}</td>
+    <td class="low">{{lookup ../low @index}}</td>
+    <td class="volume">{{lookup ../volume @index}}</td>
+    </tr>
+{{/each}}
+    </table>
+    </body>
+</html>

@@ -1,0 +1,25 @@
+[package]
+name = "taikoothong"
+version = "0.0.0"
+workspace = "../"
+edition = "2021"
+publish = false
+
+
+
+[dependencies]
+curl = "0.4.28"
+serde = {version = "1.0.51", features = ["derive"]}
+serde_json = "1.0.51"
+anyhow = "1.0.28"
+chrono = "0.4.11"
+rocket = "0.5.0-rc.2"
+round = "0.1.0"
+num-format = "0.4.4"
+
+[dependencies.rocket_dyn_templates]
+rocket_dyn_templates = "0.5.0-rc.3-2023-06-09"
+features = ["handlebars"]
+
+[toolchain]
+channel = "nightly" # nassessary to install rocket
