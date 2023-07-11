@@ -11,6 +11,7 @@ use rocket_dyn_templates::Template;
 use rocket::{Rocket, Build};
 use round::round;
 use num_format::{Locale, WriteFormatted};
+use rss::Channel;
 
 #[macro_use] extern crate rocket;
 
@@ -35,13 +36,22 @@ impl Date {
 }
 
 
-
-#[get("/<stock_id>")]
-fn get_tw_stock(stock_id: String) -> Template {
-    // let a = "👋 Hello, stock no: a22";
-
-    let response_body = get_stock_data(stock_id.as_str(), Date::Day(1), Date::Day(5));
+#[get("/<stock_id>/json")]
+fn get_tw_stock_json(stock_id: String) -> String {
+    let response_body = get_stock_data(stock_id.as_str(), Date::Day(1), Date::YearToDate);
     let response_json: Value = serde_json::from_str(response_body.as_str()).unwrap();
+
+
+    let mut stock_total_data = tw_stock_process_json(&response_json);
+
+    let stock_total_data_json = serde_json::json!(stock_total_data);
+
+    return stock_total_data_json.to_string();
+}
+
+
+fn tw_stock_process_json(response_json : &Value) -> HashMap<&str, Vec<String>>{
+
 
     let days_in_unix_time = &response_json["chart"]["result"][0]["timestamp"];
 
@@ -54,8 +64,6 @@ fn get_tw_stock(stock_id: String) -> Template {
             .collect::<Vec<_>>(),
         _ => vec![format!("Not a series of date")],
     };
-
-    println!("{:?}", &days_in_unix_time);
 
     stock_total_data.insert("date",  days_in_custom_format);
 
@@ -99,25 +107,33 @@ fn get_tw_stock(stock_id: String) -> Template {
     stock_total_data.insert("low", low_prices);
     stock_total_data.insert("volume", volumes);
 
+    return stock_total_data; 
+}
+
+#[get("/<stock_id>")]
+fn get_tw_stock(stock_id: String) -> Template {
+
+    let response_body = get_stock_data(stock_id.as_str(), Date::Day(1), Date::YearToDate);
+    let response_json: Value = serde_json::from_str(response_body.as_str()).unwrap();
+
+
+    let mut stock_total_data = tw_stock_process_json(&response_json);
+    stock_total_data.insert("stock_id", vec![stock_id]);
 
     let mut stock_total_data_by_date = transverse_stock_data_by_date(stock_total_data.clone());
     //let mut stock_total_data_by_date_wrapper = HashMap::new();
 
     //stock_total_data_by_date_wrapper.insert("data", stock_total_data_by_date);
 
-    //println!("{:?}", stock_total_data_by_date_wrapper);
-    println!("{:?}", stock_total_data);
     return Template::render("tw_stock", stock_total_data);
 }
 
 fn json_unix_time_to_date(json_value: &Value) -> String {
     let unix_time = json_value.as_i64().unwrap();
-    println!("{:?}", unix_time);
 
     let naive_time = Utc.timestamp_opt(unix_time, 0).unwrap();
 
     let date = format!("{}", naive_time.format("%Y-%m-%d"));
-    println!("{:?}", date);
 
     return date;
 }
@@ -156,27 +172,35 @@ fn get_stock_data(stock_id: &str, interval: Date, range: Date) -> String {
         stock_id, intrval_str, range_str
     );
 
-    let mut curl_easy = Easy::new(); // fetch the data with the curl binding
-    let mut response = String::new();
 
-    {
-        curl_easy.url(url.as_str()).unwrap();
 
-        let mut curl_transfer = curl_easy.transfer();
+    return get_url_data(&url);
+}
 
-        curl_transfer
-            .write_function(|data| {
-                response.push_str(std::str::from_utf8(data).unwrap());
-                Ok(data.len())
-            })
-            .unwrap();
+fn get_url_data(url : &String) -> String{
+let mut curl_easy = Easy::new(); // fetch the data with the curl binding
+let mut response = String::new();
 
-        curl_transfer.perform().unwrap();
-    }
+{
+    curl_easy.url(url.as_str()).unwrap();
 
-    let response_returned = response.clone();
+    let mut curl_transfer = curl_easy.transfer();
 
-    return response_returned;
+    curl_transfer
+        .write_function(|data| {
+            let s = match std::str::from_utf8(data){
+                Err(_) => {println!("解碼錯誤"); ""}
+                Ok(cont) => { println!("解碼成功"); cont}
+            };
+            response.push_str(s);
+            Ok(data.len())
+        })
+        .unwrap();
+
+    curl_transfer.perform().unwrap();
+}
+
+return response.clone();
 }
 
 
@@ -184,7 +208,7 @@ fn get_stock_data(stock_id: &str, interval: Date, range: Date) -> String {
 fn rocket() -> Rocket<Build>  {
     // rocket::ignite().mount("/", routes![index]).launch();
     rocket::build().attach(Template::fairing())
-        .mount("/tw", routes![get_tw_stock])
+        .mount("/tw", routes![get_tw_stock, get_tw_stock_json])
 
 
 }

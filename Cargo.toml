@@ -1,7 +1,7 @@
 [package]
 name = "taikoothong"
 version = "0.0.0"
-workspace = "../"
+#workspace = "."
 edition = "2021"
 publish = false
 
@@ -16,6 +16,7 @@ chrono = "0.4.11"
 rocket = "0.5.0-rc.2"
 round = "0.1.0"
 num-format = "0.4.4"
+rss = "1.9.0"
 
 [dependencies.rocket_dyn_templates]
 rocket_dyn_templates = "0.5.0-rc.3-2023-06-09"
