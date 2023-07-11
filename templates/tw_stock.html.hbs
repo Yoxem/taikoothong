@@ -15,13 +15,64 @@
   padding: 1em 0.6em;
   border: 1px solid red;
 }
+
+#css-table {
+      display:table;
+  }
+.css-tr {
+      display: table-row;
+  }
+.css-td {
+      display: table-cell;
+  }
+</style>
+
+<style>
+
+    body {
+        font: 10px sans-serif;
+    }
+
+    text {
+        fill: #000;
+    }
+
+    button {
+        position: absolute;
+        right: 20px;
+        top: 440px;
+        display: none;
+    }
+
+    path.candle {
+        stroke: #000000;
+    }
+
+    path.candle.body {
+        stroke-width: 0;
+    }
+
+    path.candle.up {
+        fill: #dc3526;
+        stroke: #dc3526;
+    }
+
+    path.candle.down {
+        fill: #007d30;
+        stroke: #007d30;
+    }
+
 </style>
 
 </head>
 
 <html>
     <body>
-        <table id="stock-table">
+        <h2 id="stock_id">{{stock_id.0}}</h2>
+        (<a href="{{stock_id.0}}/json">JSON</a>)
+        <div id="css-table">
+      <div class="css-tr">
+        <div class="css-td"><table id="stock-table">
             <tr id="title-of-table">
             <th>日期</th>
             <th>開盤</th>
@@ -40,6 +91,138 @@
     <td class="volume">{{lookup ../volume @index}}</td>
     </tr>
 {{/each}}
-    </table>
-    </body>
+    </table></div><div>
+
+    <h3 id="chart-title"></h3>
+    <div class="css-td">
+        <input type="radio" name="range" value="5d">5日<br>
+        <input type="radio" name="range" value="30d">30日<br>
+        <input type="radio" name="range" value="ytd" checked="checked">今年迄今<br>
+      <svg id="chart"></svg></div>
+
+        <div class="css-td">
+        <div id="news_content">{{news.0}}</div></div>
+      </div></div>
+
+<script src="http://d3js.org/d3.v4.min.js"></script>
+<script src="http://techanjs.org/techan.min.js"></script>
+<script>
+
+    var margin = {top: 20, right: 20, bottom: 30, left: 50},
+            width = 960 - margin.left - margin.right,
+            height = 500 - margin.top - margin.bottom;
+
+    var parseDate = d3.timeParse("%d-%b-%y");
+
+    var x = techan.scale.financetime()
+            .range([0, width]);
+
+    var y = d3.scaleLinear()
+            .range([height, 0]);
+
+    var candlestick = techan.plot.candlestick()
+            .xScale(x)
+            .yScale(y);
+
+    var xAxis = d3.axisBottom()
+            .scale(x)
+            .tickFormat(d3.timeFormat('%y-%m-%d'));
+
+    var yAxis = d3.axisLeft()
+            .scale(y);
+
+    var svg = d3.select('#chart')
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+    var data_by_date = [];
+    
+
+
+d3.json(`{{stock_id.0}}/json`, function(d) {
+    console.log(d);
+
+    var data_by_date = [];
+    var parseDate = d3.timeParse("%Y-%m-%d");
+
+
+    for (var i=0;i<d["close"].length;i++){
+        data_by_date.push({
+                date: parseDate(d["date"][i]),
+                open: +d["open"][i],
+                high: +d["high"][i],
+                low: +d["low"][i],
+                close: +d["close"][i],
+                volume: +d["volume"][i],
+            });};
+
+            console.log('dataGet', data_by_date);
+
+            var accessor = candlestick.accessor();
+            data_by_date = data_by_date.sort(function(a, b) { return d3.ascending(accessor.d(a), accessor.d(b)); });
+
+console.log("===" + JSON.stringify(data_by_date)); 
+
+svg.append("g")
+        .attr("class", "candlestick");
+
+
+
+svg.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + height + ")")
+        .append("text")
+        .text("日期")
+        .attr("transform", "translate(" + width + ", 0)");
+
+
+
+svg.append("g")
+        .attr("class", "y axis")
+        .append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 6)
+        .attr("dy", ".71em")
+        .style("text-anchor", "end")
+        .text("股價（NT$)");
+        
+// Data to display initially
+d3.select("#chart-title").text("今年迄今");
+draw(data_by_date);
+// Only want this button to be active if the data has loaded
+// d3.select("input").on("click", function() { draw(data_by_date); }).style("display", "inline");
+
+d3.selectAll('input[name="range"]').on("change", function(){
+    if (this.value == "ytd"){
+        draw(data_by_date);
+        d3.select("#chart-title").text("今年迄今");
+    }
+    else if(this.value == "30d"){
+        draw(data_by_date.slice(data_by_date.length-30, data_by_date.length-1));
+        d3.select("#chart-title").text("30日");        
+    }
+    else{
+        draw(data_by_date.slice(data_by_date.length-5, data_by_date.length-1));
+        d3.select("#chart-title").text("5日");        
+    };
+});
+
+
+} );  
+
+
+
+    function draw(data) {
+        x.domain(data.map(candlestick.accessor().d));
+        y.domain(techan.scale.plot.ohlc(data, candlestick.accessor()).domain());
+
+        svg.selectAll("g.candlestick").datum(data).call(candlestick);
+        svg.selectAll("g.x.axis").call(xAxis);
+        svg.selectAll("g.y.axis").call(yAxis);
+    }
+
+</script>
 </html>

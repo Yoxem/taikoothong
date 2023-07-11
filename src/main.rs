@@ -113,12 +113,18 @@ fn tw_stock_process_json(response_json : &Value) -> HashMap<&str, Vec<String>>{
 #[get("/<stock_id>")]
 fn get_tw_stock(stock_id: String) -> Template {
 
+    let rss_content = get_rss_data(stock_id.as_str());
+    println!("{:}", rss_content); 
+
     let response_body = get_stock_data(stock_id.as_str(), Date::Day(1), Date::YearToDate);
     let response_json: Value = serde_json::from_str(response_body.as_str()).unwrap();
 
 
     let mut stock_total_data = tw_stock_process_json(&response_json);
     stock_total_data.insert("stock_id", vec![stock_id]);
+
+    stock_total_data.insert("news", vec![rss_content]);
+
 
     let mut stock_total_data_by_date = transverse_stock_data_by_date(stock_total_data.clone());
     //let mut stock_total_data_by_date_wrapper = HashMap::new();
@@ -161,6 +167,16 @@ fn transverse_stock_data_by_date(orig_data : HashMap<&str, Vec<String>>) ->
 
 }
 
+fn get_rss_data(stock_id :  &str) -> String{
+    let url = format!(
+        "https://tw.stock.yahoo.com/rss?s={:}",
+        stock_id
+    );
+
+
+
+    return get_url_data(&url);
+}
 
 fn get_stock_data(stock_id: &str, interval: Date, range: Date) -> String {
     let intrval_str = interval.as_str();
