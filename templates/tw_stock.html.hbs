@@ -35,6 +35,7 @@
 
     text {
         fill: #000;
+        font-size: 14px;
     }
 
     button {
@@ -61,6 +62,45 @@
         fill: #007d30;
         stroke: #007d30;
     }
+
+        path.volume.up {
+        fill: #dc3526;
+        stroke: #dc3526;
+    }
+    path.volume.equal {
+        fill: #dc3526;
+        stroke: #dc3526;
+    }
+
+    path.volume.down {
+        fill: #007d30;
+        stroke: #007d30;
+    }
+
+    .indicator.ma-0{
+        stroke:blue;
+    }
+    
+    .text.ma-0{
+        fill:blue;
+    }
+
+    .indicator.ma-1{
+        stroke:orange;
+    }
+    
+    .text.ma-1{
+        fill:orange;
+    }
+
+    .indicator.ma-2{
+        stroke:green;
+    }
+    
+    .text.ma-2{
+        fill:green;
+    }
+
 
 </style>
 
@@ -101,28 +141,57 @@
       <svg id="chart"></svg></div>
 
         <div class="css-td">
-        <div id="news_content">{{news.0}}</div></div>
+        <div id="news_content">{{#each news}}foo:{{/each}}</div></div>
       </div></div>
 
 <script src="http://d3js.org/d3.v4.min.js"></script>
 <script src="http://techanjs.org/techan.min.js"></script>
 <script>
 
-    var margin = {top: 20, right: 20, bottom: 30, left: 50},
+    var margin = {top: 20, right: 50, bottom: 30, left: 50},
             width = 960 - margin.left - margin.right,
-            height = 500 - margin.top - margin.bottom;
+            height = 800 - margin.top - margin.bottom;
 
     var parseDate = d3.timeParse("%d-%b-%y");
 
     var x = techan.scale.financetime()
             .range([0, width]);
 
+    var y_height = height * 0.7;
     var y = d3.scaleLinear()
-            .range([height, 0]);
+            .range([y_height, 0]);
 
     var candlestick = techan.plot.candlestick()
             .xScale(x)
             .yScale(y);
+
+
+    var y_volume = d3.scaleLinear()
+            .range([y(0), y(0.3)]);
+
+
+    var volume = techan.plot.volume()
+            .accessor(candlestick.accessor())   // Set the accessor to a ohlc accessor so we get highlighted bars
+            .xScale(x)
+            .yScale(y_volume);
+
+    var volume_axis = d3.axisLeft(y_volume)
+            .ticks(5)
+            .tickFormat(d3.format(",.3s"));
+
+    var volume_accessor = volume.accessor();
+
+    var sma0 = techan.plot.sma()
+            .xScale(x)
+            .yScale(y);
+    var sma1 = techan.plot.sma()
+            .xScale(x)
+            .yScale(y);
+
+    var sma2 = techan.plot.sma()
+            .xScale(x)
+            .yScale(y);
+
 
     var xAxis = d3.axisBottom()
             .scale(x)
@@ -156,7 +225,7 @@ d3.json(`{{stock_id.0}}/json`, function(d) {
                 high: +d["high"][i],
                 low: +d["low"][i],
                 close: +d["close"][i],
-                volume: +d["volume"][i],
+                volume: parseInt(d["volume"][i].replace(/,/g, "")),
             });};
 
             console.log('dataGet', data_by_date);
@@ -164,30 +233,58 @@ d3.json(`{{stock_id.0}}/json`, function(d) {
             var accessor = candlestick.accessor();
             data_by_date = data_by_date.sort(function(a, b) { return d3.ascending(accessor.d(a), accessor.d(b)); });
 
-console.log("===" + JSON.stringify(data_by_date)); 
-
 svg.append("g")
         .attr("class", "candlestick");
+svg.append("g")
+        .attr("class", "volume")
+        .attr("transform", "translate(0," + height * 0.21 +")")
 
 
 
 svg.append("g")
         .attr("class", "x axis")
-        .attr("transform", "translate(0," + height + ")")
+        .attr("transform", "translate(0," + height * 0.7 + ")")
         .append("text")
         .text("日期")
-        .attr("transform", "translate(" + width + ", 0)");
+        .attr("transform", "translate(" + width + ", 20)");
 
+svg.append("g")
+        .attr("class", "volume axis")
+        .attr("transform", "translate(0, " + height * 0.21 + ")")
+        .append("text")
+        .text("成交量")
+        .attr("transform", "rotate(-90) translate(-"+ height * 0.50 +", 10)")
+        .attr("y", 6)
+        .attr("dy", ".71em")
+        .style("text-anchor", "end")
 
 
 svg.append("g")
         .attr("class", "y axis")
         .append("text")
-        .attr("transform", "rotate(-90)")
         .attr("y", 6)
         .attr("dy", ".71em")
         .style("text-anchor", "end")
-        .text("股價（NT$)");
+        .text("股價（NT$)")
+        .attr("transform", "translate(10, 0) rotate(-90)");
+
+
+
+    svg.append("g")
+            .attr("class", "indicator sma ma-0")
+            .attr("fill", "transparent");
+
+    svg.append("g")
+            .attr("class", "indicator sma ma-1")
+            .attr("fill", "transparent");
+
+
+    svg.append("g")
+            .attr("class", "indicator sma ma-2")
+            .attr("fill", "transparent");
+
+
+
         
 // Data to display initially
 d3.select("#chart-title").text("今年迄今");
@@ -218,10 +315,78 @@ d3.selectAll('input[name="range"]').on("change", function(){
     function draw(data) {
         x.domain(data.map(candlestick.accessor().d));
         y.domain(techan.scale.plot.ohlc(data, candlestick.accessor()).domain());
+        y_volume.domain(techan.scale.plot.volume(data).domain());
 
         svg.selectAll("g.candlestick").datum(data).call(candlestick);
+
+        svg.select("g.volume").datum(data).call(volume);
+        svg.select("g.volume.axis").call(volume_axis);
+
         svg.selectAll("g.x.axis").call(xAxis);
         svg.selectAll("g.y.axis").call(yAxis);
+
+        let sma0range = 5;
+        let sma1range = 20;
+        let sma2range = 60;
+
+
+        svg.select("g.sma.ma-0").datum(techan.indicator.sma().period(sma0range)(data)).call(sma0);
+        svg.select("g.sma.ma-1").datum(techan.indicator.sma().period(sma1range)(data)).call(sma1);
+        svg.select("g.sma.ma-2").datum(techan.indicator.sma().period(sma2range)(data)).call(sma2);
+
+        svg.select("g.sma.ma-0 g path").attr("id", "sma-0");
+        svg.select("g.sma.ma-1 g path").attr("id", "sma-1");
+        svg.select("g.sma.ma-2 g path").attr("id", "sma-2");
+
+
+    svg.append("text")
+            .attr("x", "1")
+            .attr("y", "1")
+            .append("textPath")
+            .attr("xlink:href", "#sma-0")
+            .attr("class", "ma-0 text")
+            .text("MA" + sma0range);
+
+    svg.append("text")
+            .attr("x", "1")
+            .attr("y", "1")
+            .append("textPath")
+            .attr("xlink:href", "#sma-1")
+            .attr("class", "ma-1 text")
+            .text("MA" + sma1range);
+
+    svg.append("text")
+            .attr("x", "1")
+            .attr("y", "1")
+            .append("textPath")
+            .attr("xlink:href", "#sma-2")
+            .attr("class", "ma-2 text")
+            .text("MA" + sma2range);
+
+
+
+    d3.selectAll("g.y .tick")
+    .append("line")
+    .attr("class", "gridline")
+    .attr("z-index", -100)
+    .attr("x1", 0)
+    .attr("y1", 0)
+    .attr("x2", width)
+    .attr("y2", 0)
+    .attr("stroke", "rgb(210, 210, 210)"); // line color
+
+    
+
+    d3.selectAll("g.volume .tick")
+    .append("line")
+    .attr("class", "gridline")
+    .attr("z-index", -100)
+    .attr("x1", 0)
+    .attr("y1", 0)
+    .attr("x2", width)
+    .attr("y2", 0)
+    .attr("stroke", "rgb(210, 210, 210)"); // line color
+
     }
 
 </script>
