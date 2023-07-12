@@ -1,17 +1,20 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
 
-use anyhow; // Exception Handling
-use chrono::{TimeZone, Utc};
+use chrono::{TimeZone, Utc, NaiveDateTime};
 use curl::easy::Easy;
-use serde_json::{Result, Value}; // JSON
+use serde::Serialize;
+use serde_json::{Result, Value, Value::Array}; // JSON
 use std::collections::HashMap;
-use serde_json::Value::Array;
 use rocket_dyn_templates::Template;
 use rocket::{Rocket, Build};
 use round::round;
 use num_format::{Locale, WriteFormatted};
 use rss::Channel;
+use feed_rs::parser;
+
+//use std::env;
+//use std::fs;
 
 #[macro_use] extern crate rocket;
 
@@ -22,6 +25,12 @@ enum Date {
     Max,
     YearToDate}
 
+
+    #[derive(Serialize, Debug)]
+    struct TemplateContext<'a> {
+        main : HashMap<&'a str, Vec<String>>,
+    news: Vec<HashMap<&'a str, String>>,
+    }
 
 impl Date {
     fn as_str(&self) -> String {
@@ -42,11 +51,11 @@ fn get_tw_stock_json(stock_id: String) -> String {
     let response_json: Value = serde_json::from_str(response_body.as_str()).unwrap();
 
 
-    let mut stock_total_data = tw_stock_process_json(&response_json);
+    let mut stock_main_data = tw_stock_process_json(&response_json);
 
-    let stock_total_data_json = serde_json::json!(stock_total_data);
+    let stock_main_data_json = serde_json::json!(stock_main_data);
 
-    return stock_total_data_json.to_string();
+    return stock_main_data_json.to_string();
 }
 
 
@@ -55,7 +64,7 @@ fn tw_stock_process_json(response_json : &Value) -> HashMap<&str, Vec<String>>{
 
     let days_in_unix_time = &response_json["chart"]["result"][0]["timestamp"];
 
-    let mut stock_total_data = HashMap::new();
+    let mut stock_main_data = HashMap::new();
 
     let days_in_custom_format = match days_in_unix_time {
         serde_json::Value::Array(days_vec) => days_vec
@@ -65,7 +74,7 @@ fn tw_stock_process_json(response_json : &Value) -> HashMap<&str, Vec<String>>{
         _ => vec![format!("Not a series of date")],
     };
 
-    stock_total_data.insert("date",  days_in_custom_format);
+    stock_main_data.insert("date",  days_in_custom_format);
 
     let mut open_prices : Vec<String> = vec![];
     let mut close_prices : Vec<String> = vec![];
@@ -101,35 +110,81 @@ fn tw_stock_process_json(response_json : &Value) -> HashMap<&str, Vec<String>>{
         _ => (),
     }
 
-    stock_total_data.insert("open", open_prices);
-    stock_total_data.insert("close", close_prices);
-    stock_total_data.insert("high", high_prices);
-    stock_total_data.insert("low", low_prices);
-    stock_total_data.insert("volume", volumes);
+    stock_main_data.insert("open", open_prices);
+    stock_main_data.insert("close", close_prices);
+    stock_main_data.insert("high", high_prices);
+    stock_main_data.insert("low", low_prices);
+    stock_main_data.insert("volume", volumes);
 
-    return stock_total_data; 
+    return stock_main_data; 
 }
 
 #[get("/<stock_id>")]
 fn get_tw_stock(stock_id: String) -> Template {
 
-    let rss_content = get_rss_data(stock_id.as_str());
-    println!("{:}", rss_content); 
+   let rss_xml = get_rss_data(stock_id.as_str());
+
+    //let rss_xml = fs::read_to_string("/tmp/a.rss")
+    //    .expect("Should have been able to read the file");
+
+    let rss_parsed = parser::parse(rss_xml.as_bytes()).unwrap();
+
 
     let response_body = get_stock_data(stock_id.as_str(), Date::Day(1), Date::YearToDate);
     let response_json: Value = serde_json::from_str(response_body.as_str()).unwrap();
 
-
-    let mut stock_total_data = tw_stock_process_json(&response_json);
-    stock_total_data.insert("stock_id", vec![stock_id]);
-
-    stock_total_data.insert("news", vec![rss_content]);
+    let mut stock_main_data = tw_stock_process_json(&response_json);
+    stock_main_data.insert("stock_id", vec![stock_id]);
 
 
-    let mut stock_total_data_by_date = transverse_stock_data_by_date(stock_total_data.clone());
-    //let mut stock_total_data_by_date_wrapper = HashMap::new();
+    let mut rss_entries = vec![];
 
-    //stock_total_data_by_date_wrapper.insert("data", stock_total_data_by_date);
+    for i in 0..rss_parsed.entries.len(){
+        let mut rss_entry = HashMap::new();
+        //let title = i.title.clone().unwrap().content;
+        //println!("{:}", title);
+        let title = &rss_parsed.entries[i].title;
+
+        let title_string = match title {
+            Some(a) => a.clone().content,
+            _ => "title reading error".to_string(),
+        };
+        rss_entry.insert("title", title_string);
+
+
+        let time = &rss_parsed.entries[i].published;
+        let date_string = match time {
+            Some(a) => {
+
+                 format!("{}", a.format("%Y-%m-%d"))},
+            _ => "time reading error".to_string(),
+        };
+        rss_entry.insert("date", date_string);
+
+
+        let link = &rss_parsed.entries[i].links[0].href;
+        rss_entry.insert("link", link.to_string());
+
+        let summary = &rss_parsed.entries[i].summary;
+        let summary_string = match summary {
+            Some(a) => a.clone().content,
+            _ => "summary reading error".to_string(),
+        };
+        rss_entry.insert("summary", summary_string); 
+
+        rss_entries.push(rss_entry);
+    }
+
+    println!("{:?}", rss_entries);
+    
+
+
+    let stock_total_data = TemplateContext{main : stock_main_data.clone(), news : rss_entries};
+
+    let mut stock_main_data_by_date = transverse_stock_data_by_date(stock_main_data.clone());
+    //let mut stock_main_data_by_date_wrapper = HashMap::new();
+
+    //stock_main_data_by_date_wrapper.insert("data", stock_main_data_by_date);
 
     return Template::render("tw_stock", stock_total_data);
 }
@@ -168,8 +223,7 @@ fn transverse_stock_data_by_date(orig_data : HashMap<&str, Vec<String>>) ->
 }
 
 fn get_rss_data(stock_id :  &str) -> String{
-    let url = format!(
-        "https://tw.stock.yahoo.com/rss?s={:}",
+    let url = format!("https://tw.stock.yahoo.com/rss?s={:}",
         stock_id
     );
 

@@ -108,8 +108,8 @@
 
 <html>
     <body>
-        <h2 id="stock_id">{{stock_id.0}}</h2>
-        (<a href="{{stock_id.0}}/json">JSON</a>)
+        <h2 id="stock_id">{{main.stock_id.0}}</h2>
+        (<a href="{{main.stock_id.0}}/json">JSON</a>)
         <div id="css-table">
       <div class="css-tr">
         <div class="css-td"><table id="stock-table">
@@ -121,16 +121,17 @@
             <th>最低</th>
             <th>成交量</th>
             </tr>
+{{#with main}}
 {{#each date}}
    <tr id={{this}}>
-    <td id="date">{{this}}</td>
+    <td class="date">{{this}}</td>
     <td class="open">{{lookup ../open @index}}</td>
     <td class="close">{{lookup ../close @index}}</td>
     <td class="high">{{lookup ../high @index}}</td>
     <td class="low">{{lookup ../low @index}}</td>
     <td class="volume">{{lookup ../volume @index}}</td>
     </tr>
-{{/each}}
+{{/each}}{{/with}}
     </table></div><div>
 
     <h3 id="chart-title"></h3>
@@ -140,8 +141,13 @@
         <input type="radio" name="range" value="ytd" checked="checked">今年迄今<br>
       <svg id="chart"></svg></div>
 
-        <div class="css-td">
-        <div id="news_content">{{#each news}}foo:{{/each}}</div></div>
+        <div class="css-td"><h3 id="chart-title">Yahoo 股市新聞</h3>
+        <div id="news_content">{{#each news}}
+            <div><div class="news-title"><a href="link">{{this.title}}</a></div>
+        <div class="news-date">{{this.date}}</div>
+                <div class="news-summary">{{this.summary}}……</div>
+
+        {{/each}}</div></div>
       </div></div>
 
 <script src="http://d3js.org/d3.v4.min.js"></script>
@@ -211,7 +217,7 @@
     
 
 
-d3.json(`{{stock_id.0}}/json`, function(d) {
+d3.json(`{{main.stock_id.0}}/json`, function(d) {
     console.log(d);
 
     var data_by_date = [];
