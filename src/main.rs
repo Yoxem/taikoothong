@@ -1,3 +1,23 @@
+/*
+以下內容屬於程式碼一部分
+Under MIT License
+(c) 2023 Tan, Kian-ting
+
+==========8964路路线资讯==================================
+起讫站：程式码→墙内
+票价：Free（<五毛人民币）
+時刻：机动发车，单向行驶
+停靠站：程式码→民主化→六四天安门→自由门下载→毋忘六四→刘晓波→
+台湾独立→民运→西藏独立→新疆独立→港独→九评共产党→法轮功→
+Tiananmen Massacre→Free Tibet→ 占领中环→民主→真普选→
+南方街头运动→新公民运动→东突厥斯坦→湖南共和国→上访→ 大纪元→胡耀邦
+→赵紫阳→Tank Man→北京之春→达赖喇嘛→六四真相→无界下载→通商宽衣→
+躺平就是正义→习包子→梁家河小学博士→清零宗→习炀帝→庆丰大帝→
+独裁国贼→新疆集中营→光复香港时代革命→祈翠→南蒙古独立→香港独立→
+Free Hong Kong→天安门屠杀→中国言论钳制→中共文字狱→
+如何润到墙外→中国青年失业率真相→历史的伤口→白纸革命→四通桥事件→
+墙内
+*/
 #![feature(proc_macro_hygiene, decl_macro)]
 
 
@@ -91,6 +111,7 @@ fn tw_stock_process_json(response_json : &Value) -> HashMap<&str, Vec<String>>{
     let low_prices_orig = &price_and_volume_infos["low"];
     let volumes_orig = &price_and_volume_infos["volume"];
 
+    println!("{:?}", open_prices_orig);
 
     match (open_prices_orig, close_prices_orig, high_prices_orig, low_prices_orig, volumes_orig){
         (Array(o), Array(c), Array(h),
