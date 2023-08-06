@@ -7,7 +7,7 @@ personal stock viewing webpage
 ## TODO
 
 - [ ] RSS、XML 異常應對措施
-- [  ] MACD 等等ê圖片
+  - [ ] MACD 等等ê圖片
 - [ ] 滑鼠指標suá kàu K線頂懸，顯示
   - [ ] 水平線
   - [ ] 垂直線
