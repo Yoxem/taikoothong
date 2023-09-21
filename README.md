@@ -1,6 +1,8 @@
 # taikoothong
 personal stock viewing webpage
 
+**IMPORTANT**: it's moved to :https://kianting.info/wiki/w/Project:Taikoothong
+
 ## 部署kàu webhosting
 [參考記錄](http://yoxem.github.io/2023/07/27/ti-a2hosting-deploy-rust-rocket-app-ing-imageapp/)
 
